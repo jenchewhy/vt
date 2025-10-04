@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LRS Voting Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .title {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card-white {
+            background: #1e293b;
+            border: 2px solid white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 1.125rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-green {
+            background: #22c55e;
+            color: white;
+        }
+        .btn-green:hover:not(:disabled) {
+            background: #16a34a;
+        }
+        .btn-red {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-red:hover {
+            background: #dc2626;
+        }
+        .btn-gray {
+            background: #475569;
+            color: white;
+        }
+        .btn-gray:hover {
+            background: #334155;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        .player-tile {
+            aspect-ratio: 1;
+            background: #334155;
+            border: 2px solid #475569;
+            border-radius: 1rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            transform: scale(0.95);
+        }
+        .player-tile:hover:not(:disabled) {
+            transform: scale(1.00);
+            background: #475569;
+        }
+        .player-tile:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .player-tile.selected {
+            background: #22c55e;
+            border-color: #22c55e;
+        }
+        .player-tile.disabled-vote {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .player-number {
+            font-size: 6.3rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 2rem;
+        }
+        .player-badge {
+            background: #22c55e;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .player-badge.white {
+            background: white;
+            color: #22c55e;
+        }
+        .timer {
+            background: #ef4444;
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .subtitle {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .text-white {
+            color: white;
+        }
+        .text-gray {
+            color: #94a3b8;
+        }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .flex-center {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .vote-result {
+            background: #334155;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .vote-result.top {
+            border: 4px solid #ef4444;
+        }
+        .voter-avatar {
+            width: 5rem;
+            height: 5rem;
+            background: #ef4444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .voter-chip {
+            background: #475569;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .vote-count {
+            background: #0f172a;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .flex-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+            }
+            .player-number {
+                font-size: 4rem;
+            }
+            .grid-results {
+                grid-template-columns: 1fr;
+            }
+        }
+        .grid-results {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+        .no-results {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 1.25rem;
+            padding: 5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // State variables
+        let page = 'voting';
+        let totalPlayers = 10;
+        let myPlayerNumber = null;
+        let selectedVote = null;
+        let isVoting = false;
+        let timeLeft = 10;
+        let votes = {};
+        let voteHistory = [];
+        let currentRound = 1;
+        let selectedPlayers = [];
+        let timerInterval = null;
+
+        // Timer function
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (isVoting && timeLeft > 0) {
+                    timeLeft--;
+                    render();
+                } else if (isVoting && timeLeft === 0) {
+                    endVoting();
+                }
+            }, 1000);
+        }
+
+        function startVoting() {
+            isVoting = true;
+            timeLeft = 10;
+            votes = {};
+            selectedVote = null;
+            startTimer();
+            render();
+        }
+
+        function endVoting() {
+            isVoting = false;
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const finalVotes = { ...votes };
+            if (myPlayerNumber && selectedVote) {
+                finalVotes[myPlayerNumber] = selectedVote;
+            }
+            const results = { round: currentRound, votes: finalVotes };
+            voteHistory.push(results);
+            currentRound++;
+            selectedVote = null;
+            render();
+        }
+
+        function addPlayers() {
+            if (totalPlayers < 15) {
+                totalPlayers++;
+                render();
+            }
+        }
+
+        function resetGame() {
+            votes = {};
+            voteHistory = [];
+            currentRound = 1;
+            myPlayerNumber = null;
+            selectedVote = null;
+            isVoting = false;
+            timeLeft = 10;
+            selectedPlayers = [];
+            totalPlayers = 10;
+            if (timerInterval) clearInterval(timerInterval);
+            render();
+        }
+
+        function selectPlayerNumber(num) {
+            myPlayerNumber = num;
+            selectedPlayers.push(num);
+            render();
+        }
+
+        function deselectPlayerNumber() {
+            if (myPlayerNumber) {
+                selectedPlayers = selectedPlayers.filter(num => num !== myPlayerNumber);
+            }
+            myPlayerNumber = null;
+            render();
+        }
+
+        function selectVote(num) {
+            if (isVoting) {
+                selectedVote = num;
+                render();
+            }
+        }
+
+        function getVoteResults(roundVotes) {
+            const results = {};
+            const didNotVote = [];
+            
+            Object.entries(roundVotes).forEach(([voter, voted]) => {
+                if (!results[voted]) {
+                    results[voted] = [];
+                }
+                results[voted].push(parseInt(voter));
+            });
+
+            for (let i = 1; i <= totalPlayers; i++) {
+                if (!roundVotes[i]) {
+                    didNotVote.push(i);
+                }
+            }
+
+            return { results, didNotVote };
+        }
+
+        // Render functions
+        function renderVotingPage() {
+            let html = `
+                <div class="container">
+                    <h1 class="title">LRS Voting</h1>
+            `;
+
+            // Master Controls for Player 1
+            if (myPlayerNumber === 1) {
+                html += `
+                    <div class="card">
+                        <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">
+                            👥 Master Controls
+                        </h2>
+                        <div class="grid-2" style="margin-bottom: 0.75rem;">
+                            <button onclick="startVoting()" ${isVoting ? 'disabled' : ''} class="btn btn-green">
+                                ▶ Start Voting
+                            </button>
+                            <button onclick="resetGame()" class="btn btn-red">
+                                ↻ Reset Game
+                            </button>
+                        </div>
+                        <button onclick="page = 'results'; render()" class="btn btn-gray" style="width: 100%;">
+                            View Results
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Voting Timer
+            if (isVoting) {
+                html += `<div class="timer">Voting ends in: ${timeLeft}s</div>`;
+            }
+
+            // Player Selection
+            if (!myPlayerNumber) {
+                html += `
+                    <div style="margin-bottom: 2rem;">
+                        <h2 class="subtitle">Select Your Player Number</h2>
+                `;
+                
+                if (totalPlayers < 15) {
+                    html += `
+                        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+                            <button onclick="addPlayers()" class="btn btn-gray">
+                                + Add Player (${totalPlayers}/15)
+                            </button>
+                        </div>
+                    `;
+                }
+
+                html += '<div class="grid-2">';
+                for (let i = 1; i <= totalPlayers; i++) {
+                    const isTaken = selectedPlayers.includes(i);
+                    html += `
+                        <button onclick="selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
+                            <div class="player-number">${i}</div>
+                            <div class="player-badge">
+                                ${isTaken ? 'TAKEN' : 'SELECT'}
+                            </div>
+                        </button>
+                    `;
+                }
+                html += '</div></div>';
+            }
+
+            // Voting Interface
+            if (myPlayerNumber) {
+                html += `
+                    <div class="card-white">
+                        <div class="flex-between">
+                            <div>
+                                <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem;">
+                                    You are Player ${myPlayerNumber}
+                                </h2>
+                                <p class="text-gray">Round ${currentRound}</p>
+                            </div>
+                            <button onclick="deselectPlayerNumber()" class="btn btn-gray">
+                                ← Change Player No.
+                            </button>
+                        </div>
+                    </div>
+
+                    <h2 class="subtitle">
+                        ${isVoting ? 'Vote now...' : 'Waiting for Player 1 to start vote'}
+                    </h2>
+
+                    <div class="grid-2">
+                `;
+
+                for (let i = 1; i <= totalPlayers; i++) {
+                    if (i !== myPlayerNumber) {
+                        const isSelected = selectedVote === i;
+                        const classes = isSelected 
+                            ? 'player-tile selected'
+                            : !isVoting
+                            ? 'player-tile disabled-vote'
+                            : 'player-tile';
+                        html += `
+                            <button onclick="selectVote(${i})" ${!isVoting ? 'disabled' : ''} class="${classes}">
+                                <div class="player-number">${i}</div>
+                                <div class="player-badge ${isSelected ? 'white' : ''}">
+                                    ${isSelected ? 'SELECTED' : 'VOTE'}
+                                </div>
+                            </button>
+                        `;
+                    }
+                }
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderResultsPage() {
+            let html = `
+                <div class="container">
+                    <h1 class="title">Voting Results</h1>
+
+                    <div class="flex-between" style="margin-bottom: 2rem;">
+                        <button onclick="page = 'voting'; render()" class="btn btn-gray">
+                            ← Back to Voting
+                        </button>
+            `;
+
+            if (isVoting) {
+                html += `<div class="timer" style="margin: 0;">Voting Active: ${timeLeft}s</div>`;
+            }
+
+            html += '</div>';
+
+            if (voteHistory.length === 0) {
+                html += `<div class="no-results">No voting history yet...</div>`;
+            } else {
+                html += '<div class="grid-results">';
+                
+                voteHistory.forEach((record) => {
+                    const { results, didNotVote } = getVoteResults(record.votes);
+                    
+                    html += `
+                        <div class="card">
+                            <h2 class="text-white" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem;">
+                                Round ${record.round}
+                            </h2>
+                            <div style="margin-bottom: 1.5rem;">
+                    `;
+
+                    const sortedResults = Object.entries(results).sort(([, a], [, b]) => b.length - a.length);
+                    sortedResults.forEach(([player, voters], index) => {
+                        html += `
+                            <div class="vote-result ${index === 0 ? 'top' : ''}">
+                                <div class="flex-wrap" style="align-items: center;">
+                                    <div class="voter-avatar">${player}</div>
+                                    <span class="text-white" style="font-weight: 600; font-size: 1.125rem;">voted by</span>
+                                    <div class="flex-wrap" style="flex: 1;">
+                        `;
+                        
+                        voters.sort((a, b) => a - b).forEach(voter => {
+                            html += `<span class="voter-chip">${voter}</span>`;
+                        });
+
+                        html += `
+                                    </div>
+                                    <div class="vote-count">
+                                        ${voters.length} ${voters.length === 1 ? 'vote' : 'votes'}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div>';
+
+                    if (didNotVote.length > 0) {
+                        html += `
+                            <div class="vote-result">
+                                <div class="flex-wrap" style="align-items: center;">
+                                    <span class="text-gray" style="font-weight: 600; font-size: 1.125rem;">Did Not Vote:</span>
+                                    <div class="flex-wrap">
+                        `;
+                        
+                        didNotVote.sort((a, b) => a - b).forEach(player => {
+                            html += `<span class="voter-chip">${player}</span>`;
+                        });
+
+                        html += '</div></div></div>';
+                    }
+
+                    html += '</div>';
+                });
+
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            if (page === 'voting') {
+                app.innerHTML = renderVotingPage();
+            } else {
+                app.innerHTML = renderResultsPage();
+            }
+        }
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
