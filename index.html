@@ -404,31 +404,41 @@
         }
 
         async function resetGame() {
-            if (myPlayerNumber !== 1) return;
-            if (timerInterval) clearInterval(timerInterval);
-            
-            const newState = {
-                totalPlayers: 10,
-                selectedPlayers: [],
-                isVoting: false,
-                timeLeft: 10,
-                currentRound: 1,
-                votes: {},
-                voteHistory: []
-            };
-            
-            await set(ref(db, 'game'), newState);
-            
-            myPlayerNumber = null;
-            selectedVote = null;
-            page = 'voting';
-        }
+    if (myPlayerNumber !== 1) return;
+    if (timerInterval) clearInterval(timerInterval);
+    
+    const newState = {
+        totalPlayers: 10,
+        selectedPlayers: [0],  // Placeholder
+        isVoting: false,
+        timeLeft: 10,
+        currentRound: 1,
+        votes: {placeholder: 0},  // Placeholder
+        voteHistory: [null]  // Placeholder
+    };
+    
+    await set(ref(db, 'game'), newState);
+    
+    // Clean up placeholders
+    setTimeout(async () => {
+        await update(ref(db, 'game'), {
+            selectedPlayers: [0],
+            votes: {placeholder: 0},
+            voteHistory: [null]
+        });
+    }, 100);
+    
+    myPlayerNumber = null;
+    selectedVote = null;
+    page = 'voting';
+}
 
         function selectPlayerNumber(num) {
-            if (gameState.selectedPlayers.includes(num)) return;
+            const selectedPlayers = gameState.selectedPlayers || [];
+            if (selectedPlayers.includes(num)) return;
             
             myPlayerNumber = num;
-            const newSelectedPlayers = [...gameState.selectedPlayers, num];
+            const newSelectedPlayers = [...selectedPlayers, num];
             
             update(ref(db, 'game'), {
                 selectedPlayers: newSelectedPlayers
@@ -438,7 +448,8 @@
         function deselectPlayerNumber() {
             if (!myPlayerNumber) return;
             
-            const newSelectedPlayers = gameState.selectedPlayers.filter(n => n !== myPlayerNumber);
+            const selectedPlayers = gameState.selectedPlayers || [];
+            const newSelectedPlayers = selectedPlayers.filter(n => n !== myPlayerNumber);
             myPlayerNumber = null;
             
             update(ref(db, 'game'), {
@@ -530,7 +541,7 @@
 
                 html += '<div class="grid-2">';
                 for (let i = 1; i <= gameState.totalPlayers; i++) {
-                    const isTaken = gameState.selectedPlayers.includes(i);
+                    const isTaken = (gameState.selectedPlayers || []).includes(i);
                     html += `
                         <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
                             <div class="player-number">${i}</div>
