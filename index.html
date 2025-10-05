@@ -307,6 +307,8 @@
         let selectedVote = null;
         let timerInterval = null;
         let isConnected = false;
+        let localTimeLeft = 10;
+        let isListeningToTimer = true;
 
         // Connection status monitoring
         const connectedRef = ref(db, '.info/connected');
@@ -331,6 +333,8 @@
         onValue(gameRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
+                const wasVoting = gameState.isVoting;
+                
                 // Ensure arrays/objects exist with default values
                 gameState = {
                     totalPlayers: data.totalPlayers || 10,
@@ -341,6 +345,19 @@
                     votes: data.votes || {},
                     voteHistory: data.voteHistory || []
                 };
+                
+                localTimeLeft = gameState.timeLeft;
+                
+                // Start local timer when voting begins
+                if (gameState.isVoting && !wasVoting) {
+                    startLocalTimer();
+                }
+                
+                // Stop local timer when voting ends
+                if (!gameState.isVoting && wasVoting) {
+                    stopLocalTimer();
+                }
+                
                 render();
             }
         });
@@ -360,28 +377,35 @@
             }
         });
 
-        // Timer synchronization
-        const timerRef = ref(db, 'game/timeLeft');
-        onValue(timerRef, (snapshot) => {
-            const time = snapshot.val();
-            if (time !== null && gameState.isVoting) {
-                gameState.timeLeft = time;
-                
-                // Only update timer display, don't re-render entire page
-                const timerElements = document.querySelectorAll('.timer');
-                timerElements.forEach(el => {
-                    if (el.textContent.includes('Voting ends in')) {
-                        el.textContent = `Voting ends in: ${time}s`;
-                    } else if (el.textContent.includes('Voting Active')) {
-                        el.textContent = `Voting Active: ${time}s`;
-                    }
-                });
-                
-                if (time === 0 && myPlayerNumber === 1) {
-                    endVoting();
+        // Local timer to update display without re-rendering
+        function startLocalTimer() {
+            stopLocalTimer();
+            localTimeLeft = gameState.timeLeft;
+            
+            timerInterval = setInterval(() => {
+                if (localTimeLeft > 0) {
+                    localTimeLeft--;
+                    // Only update timer display, don't re-render
+                    const timerElements = document.querySelectorAll('.timer');
+                    timerElements.forEach(el => {
+                        if (el.textContent.includes('Voting ends in')) {
+                            el.textContent = `Voting ends in: ${localTimeLeft}s`;
+                        } else if (el.textContent.includes('Voting Active')) {
+                            el.textContent = `Voting Active: ${localTimeLeft}s`;
+                        }
+                    });
+                } else {
+                    stopLocalTimer();
                 }
+            }, 1000);
+        }
+
+        function stopLocalTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
             }
-        });
+        }
 
         // Start timer countdown (only Player 1 controls this)
         function startTimerCountdown() {
@@ -393,6 +417,7 @@
                     await update(ref(db, 'game'), {
                         timeLeft: gameState.timeLeft - 1
                     });
+                    gameState.timeLeft--;
                 } else if (gameState.isVoting && gameState.timeLeft === 0) {
                     clearInterval(timerInterval);
                     endVoting();
@@ -551,7 +576,7 @@
 
             // Voting Timer
             if (gameState.isVoting) {
-                html += `<div class="timer">Voting ends in: ${gameState.timeLeft}s</div>`;
+                html += `<div class="timer">Voting ends in: ${localTimeLeft}s</div>`;
             }
 
             // Player Selection
@@ -593,8 +618,11 @@
                     <div class="card-white">
                         <div class="flex-between">
                             <div>
+                                <h2 class="text-white" style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem;">
+                                    You are
+                                </h2>
                                 <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem;">
-                                    You are Player ${myPlayerNumber}
+                                    Player ${myPlayerNumber}
                                 </h2>
                                 <p class="text-gray">Round ${gameState.currentRound}</p>
                             </div>
@@ -648,7 +676,7 @@
             `;
 
             if (gameState.isVoting) {
-                html += `<div class="timer" style="margin: 0;">Voting Active: ${gameState.timeLeft}s</div>`;
+                html += `<div class="timer" style="margin: 0;">Voting Active: ${localTimeLeft}s</div>`;
             }
 
             html += '</div>';
