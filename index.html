@@ -82,16 +82,15 @@
         }
         .grid-2 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
             max-width: 100%;
         }
         .player-tile {
-            aspect-ratio: 1;
             background: #334155;
             border: 2px solid #475569;
             border-radius: 1rem;
-            padding: 1rem;
+            padding: 1.5rem 1rem;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -99,8 +98,7 @@
             cursor: pointer;
             transition: transform 0.2s, background 0.2s;
             transform: scale(0.95);
-            min-height: 180px;
-            max-width: 100%;
+            min-height: 160px;
         }
         .player-tile:hover:not(:disabled) {
             transform: scale(1.00);
@@ -119,10 +117,10 @@
             cursor: not-allowed;
         }
         .player-number {
-            font-size: 6rem;
+            font-size: 4.5rem;
             font-weight: bold;
             color: white;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
         }
         .player-badge {
             background: #22c55e;
@@ -221,8 +219,8 @@
                 font-size: 2rem;
             }
             .player-number {
-                font-size: 3.5rem;
-                margin-bottom: 1rem;
+                font-size: 3rem;
+                margin-bottom: 0.75rem;
             }
             .grid-results {
                 grid-template-columns: 1fr;
@@ -232,10 +230,15 @@
             }
             .player-tile {
                 min-height: 140px;
-                padding: 0.75rem;
+                padding: 1rem 0.75rem;
             }
             .container {
                 padding: 1rem;
+            }
+        }
+        @media (min-width: 769px) {
+            .grid-2 {
+                grid-template-columns: repeat(4, 1fr);
             }
         }
         .grid-results {
@@ -295,7 +298,7 @@
         let page = 'voting';
         let myPlayerNumber = null;
         let gameState = {
-            totalPlayers: 10,
+            totalPlayers: 15,
             selectedPlayers: [],
             isVoting: false,
             timeLeft: 10,
@@ -366,7 +369,7 @@
         get(gameRef).then((snapshot) => {
             if (!snapshot.exists()) {
                 set(gameRef, {
-                    totalPlayers: 10,
+                    totalPlayers: 15,
                     selectedPlayers: [],
                     isVoting: false,
                     timeLeft: 10,
@@ -407,10 +410,10 @@
             }
         }
 
-        // Start timer countdown (only Player 1 controls this)
+        // Start timer countdown (only Player 0 controls this)
         function startTimerCountdown() {
             if (timerInterval) clearInterval(timerInterval);
-            if (myPlayerNumber !== 1) return;
+            if (myPlayerNumber !== 0) return;
 
             timerInterval = setInterval(async () => {
                 if (gameState.isVoting && gameState.timeLeft > 0) {
@@ -427,7 +430,7 @@
 
         // Game functions
         async function startVoting() {
-            if (myPlayerNumber !== 1) return;
+            if (myPlayerNumber !== 0) return;
             
             await update(ref(db, 'game'), {
                 isVoting: true,
@@ -439,7 +442,7 @@
         }
 
         async function endVoting() {
-            if (myPlayerNumber !== 1) return;
+            if (myPlayerNumber !== 0) return;
             if (timerInterval) clearInterval(timerInterval);
             
             const finalVotes = { ...gameState.votes };
@@ -468,11 +471,11 @@
         }
 
         async function resetGame() {
-            if (myPlayerNumber !== 1) return;
+            if (myPlayerNumber !== 0) return;
             if (timerInterval) clearInterval(timerInterval);
             
             const newState = {
-                totalPlayers: 10,
+                totalPlayers: 15,
                 selectedPlayers: [],
                 isVoting: false,
                 timeLeft: 10,
@@ -536,7 +539,7 @@
                 });
             }
 
-            for (let i = 1; i <= gameState.totalPlayers; i++) {
+            for (let i = 0; i <= gameState.totalPlayers; i++) {
                 if (!roundVotes || !roundVotes[i]) {
                     didNotVote.push(i);
                 }
@@ -552,8 +555,8 @@
                     <h1 class="title">LRS Voting</h1>
             `;
 
-            // Master Controls for Player 1
-            if (myPlayerNumber === 1) {
+            // Master Controls for Player 0
+            if (myPlayerNumber === 0) {
                 html += `
                     <div class="card">
                         <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">
@@ -580,25 +583,15 @@
             }
 
             // Player Selection
-            if (!myPlayerNumber) {
+            if (myPlayerNumber === null) {
                 html += `
                     <div style="margin-bottom: 2rem;">
                         <h2 class="subtitle">Select Your Player Number</h2>
                 `;
-                
-                if (gameState.totalPlayers < 15) {
-                    html += `
-                        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
-                            <button onclick="window.addPlayers()" class="btn btn-gray">
-                                + Add Player (${gameState.totalPlayers}/15)
-                            </button>
-                        </div>
-                    `;
-                }
 
                 html += '<div class="grid-2">';
                 const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
-                for (let i = 1; i <= gameState.totalPlayers; i++) {
+                for (let i = 0; i <= gameState.totalPlayers; i++) {
                     const isTaken = selectedPlayers.includes(i);
                     html += `
                         <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
@@ -613,7 +606,7 @@
             }
 
             // Voting Interface
-            if (myPlayerNumber) {
+            if (myPlayerNumber !== null) {
                 html += `
                     <div class="card-white">
                         <div class="flex-between">
@@ -633,13 +626,13 @@
                     </div>
 
                     <h2 class="subtitle">
-                        ${gameState.isVoting ? 'Vote now...' : 'Waiting for Player 1 to start vote'}
+                        ${gameState.isVoting ? 'Vote now...' : 'Waiting for Player 0 to start vote'}
                     </h2>
 
                     <div class="grid-2">
                 `;
 
-                for (let i = 1; i <= gameState.totalPlayers; i++) {
+                for (let i = 0; i <= gameState.totalPlayers; i++) {
                     if (i !== myPlayerNumber) {
                         const isSelected = selectedVote === i;
                         const classes = isSelected 
