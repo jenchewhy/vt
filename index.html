@@ -82,8 +82,9 @@
         }
         .grid-2 {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
+            max-width: 100%;
         }
         .player-tile {
             aspect-ratio: 1;
@@ -96,8 +97,10 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: transform 0.2s, background 0.2s;
             transform: scale(0.95);
+            min-height: 180px;
+            max-width: 100%;
         }
         .player-tile:hover:not(:disabled) {
             transform: scale(1.00);
@@ -218,10 +221,21 @@
                 font-size: 2rem;
             }
             .player-number {
-                font-size: 4rem;
+                font-size: 3.5rem;
+                margin-bottom: 1rem;
             }
             .grid-results {
                 grid-template-columns: 1fr;
+            }
+            .grid-2 {
+                gap: 0.75rem;
+            }
+            .player-tile {
+                min-height: 140px;
+                padding: 0.75rem;
+            }
+            .container {
+                padding: 1rem;
             }
         }
         .grid-results {
@@ -352,12 +366,20 @@
             const time = snapshot.val();
             if (time !== null && gameState.isVoting) {
                 gameState.timeLeft = time;
-                if (time === 0) {
-                    if (myPlayerNumber === 1) {
-                        endVoting();
+                
+                // Only update timer display, don't re-render entire page
+                const timerElements = document.querySelectorAll('.timer');
+                timerElements.forEach(el => {
+                    if (el.textContent.includes('Voting ends in')) {
+                        el.textContent = `Voting ends in: ${time}s`;
+                    } else if (el.textContent.includes('Voting Active')) {
+                        el.textContent = `Voting Active: ${time}s`;
                     }
+                });
+                
+                if (time === 0 && myPlayerNumber === 1) {
+                    endVoting();
                 }
-                render();
             }
         });
 
