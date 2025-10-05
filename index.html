@@ -263,14 +263,14 @@
         // PASTE YOUR FIREBASE CONFIG HERE
         // ==========================================
         const firebaseConfig = {
-            apiKey: "AIzaSyBGCc8yrSo0JMYSodAHLhAELGmW2GgP2b8",
+            apiKey: "AIzaSyBGCc8yrSo0JMYSodAHLhAELGmWZGgP2b4",
             authDomain: "lrs-vt.firebaseapp.com",
             databaseURL: "https://lrs-vt-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "lrs-vt",
             storageBucket: "lrs-vt.firebasestorage.app",
             messagingSenderId: "434257499319",
-            appId: "1:434257499319:web:cf9e0912463882e98b6932",
-            measurementId: "G-CMLSWMY6N7"
+            appId: "1:434257499319:web:cf9ae091246388e98b6932",
+            measurementId: "G-CMLSMNY6N7"
         };
 
         // Initialize Firebase
@@ -317,7 +317,16 @@
         onValue(gameRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
-                gameState = data;
+                // Ensure arrays/objects exist with default values
+                gameState = {
+                    totalPlayers: data.totalPlayers || 10,
+                    selectedPlayers: data.selectedPlayers || [],
+                    isVoting: data.isVoting || false,
+                    timeLeft: data.timeLeft || 10,
+                    currentRound: data.currentRound || 1,
+                    votes: data.votes || {},
+                    voteHistory: data.voteHistory || []
+                };
                 render();
             }
         });
@@ -325,7 +334,15 @@
         // Initialize game state if it doesn't exist
         get(gameRef).then((snapshot) => {
             if (!snapshot.exists()) {
-                set(gameRef, gameState);
+                set(gameRef, {
+                    totalPlayers: 10,
+                    selectedPlayers: [],
+                    isVoting: false,
+                    timeLeft: 10,
+                    currentRound: 1,
+                    votes: {},
+                    voteHistory: []
+                });
             }
         });
 
@@ -379,7 +396,7 @@
             if (timerInterval) clearInterval(timerInterval);
             
             const finalVotes = { ...gameState.votes };
-            const newHistory = [...gameState.voteHistory];
+            const newHistory = Array.isArray(gameState.voteHistory) ? [...gameState.voteHistory] : [];
             newHistory.push({
                 round: gameState.currentRound,
                 votes: finalVotes
@@ -404,37 +421,28 @@
         }
 
         async function resetGame() {
-    if (myPlayerNumber !== 1) return;
-    if (timerInterval) clearInterval(timerInterval);
-    
-    const newState = {
-        totalPlayers: 10,
-        selectedPlayers: [0],  // Placeholder
-        isVoting: false,
-        timeLeft: 10,
-        currentRound: 1,
-        votes: {placeholder: 0},  // Placeholder
-        voteHistory: [null]  // Placeholder
-    };
-    
-    await set(ref(db, 'game'), newState);
-    
-    // Clean up placeholders
-    setTimeout(async () => {
-        await update(ref(db, 'game'), {
-            selectedPlayers: [0],
-            votes: {placeholder: 0},
-            voteHistory: [null]
-        });
-    }, 100);
-    
-    myPlayerNumber = null;
-    selectedVote = null;
-    page = 'voting';
-}
+            if (myPlayerNumber !== 1) return;
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const newState = {
+                totalPlayers: 10,
+                selectedPlayers: [],
+                isVoting: false,
+                timeLeft: 10,
+                currentRound: 1,
+                votes: {},
+                voteHistory: []
+            };
+            
+            await set(ref(db, 'game'), newState);
+            
+            myPlayerNumber = null;
+            selectedVote = null;
+            page = 'voting';
+        }
 
         function selectPlayerNumber(num) {
-            const selectedPlayers = gameState.selectedPlayers || [];
+            const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
             if (selectedPlayers.includes(num)) return;
             
             myPlayerNumber = num;
@@ -448,7 +456,7 @@
         function deselectPlayerNumber() {
             if (!myPlayerNumber) return;
             
-            const selectedPlayers = gameState.selectedPlayers || [];
+            const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
             const newSelectedPlayers = selectedPlayers.filter(n => n !== myPlayerNumber);
             myPlayerNumber = null;
             
@@ -472,15 +480,17 @@
             const results = {};
             const didNotVote = [];
             
-            Object.entries(roundVotes).forEach(([voter, voted]) => {
-                if (!results[voted]) {
-                    results[voted] = [];
-                }
-                results[voted].push(parseInt(voter));
-            });
+            if (roundVotes && typeof roundVotes === 'object') {
+                Object.entries(roundVotes).forEach(([voter, voted]) => {
+                    if (!results[voted]) {
+                        results[voted] = [];
+                    }
+                    results[voted].push(parseInt(voter));
+                });
+            }
 
             for (let i = 1; i <= gameState.totalPlayers; i++) {
-                if (!roundVotes[i]) {
+                if (!roundVotes || !roundVotes[i]) {
                     didNotVote.push(i);
                 }
             }
@@ -540,8 +550,9 @@
                 }
 
                 html += '<div class="grid-2">';
+                const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
                 for (let i = 1; i <= gameState.totalPlayers; i++) {
-                    const isTaken = (gameState.selectedPlayers || []).includes(i);
+                    const isTaken = selectedPlayers.includes(i);
                     html += `
                         <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
                             <div class="player-number">${i}</div>
@@ -620,12 +631,15 @@
 
             html += '</div>';
 
-            if (gameState.voteHistory.length === 0) {
+            const voteHistory = Array.isArray(gameState.voteHistory) ? gameState.voteHistory : [];
+            if (voteHistory.length === 0) {
                 html += `<div class="no-results">No voting history yet...</div>`;
             } else {
                 html += '<div class="grid-results">';
                 
-                gameState.voteHistory.forEach((record) => {
+                voteHistory.forEach((record) => {
+                    if (!record || !record.votes) return;
+                    
                     const { results, didNotVote } = getVoteResults(record.votes);
                     
                     html += `
