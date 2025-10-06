@@ -312,6 +312,7 @@
         let isConnected = false;
         let localTimeLeft = 10;
         let isListeningToTimer = true;
+        let isTimerController = false;
 
         // Connection status monitoring
         const connectedRef = ref(db, '.info/connected');
@@ -410,19 +411,21 @@
             }
         }
 
-        // Start timer countdown (anyone can trigger from results page)
+        // Start timer countdown (controlled by whoever clicks Start Voting)
         function startTimerCountdown() {
             if (timerInterval) clearInterval(timerInterval);
+            isTimerController = true;
 
             timerInterval = setInterval(async () => {
                 if (gameState.isVoting && gameState.timeLeft > 0) {
+                    const newTime = gameState.timeLeft - 1;
                     await update(ref(db, 'game'), {
-                        timeLeft: gameState.timeLeft - 1
+                        timeLeft: newTime
                     });
-                    gameState.timeLeft--;
-                } else if (gameState.isVoting && gameState.timeLeft === 0) {
+                } else if (gameState.isVoting && gameState.timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    endVoting();
+                    isTimerController = false;
+                    await endVoting();
                 }
             }, 1000);
         }
@@ -435,7 +438,10 @@
                 votes: {}
             });
             
-            startTimerCountdown();
+            // Start the countdown from this device
+            setTimeout(() => {
+                startTimerCountdown();
+            }, 100);
         }
 
         async function endVoting() {
@@ -661,7 +667,7 @@
                             👥 Master Controls
                         </h2>
                         <div class="grid-2" style="margin-bottom: 0.75rem;">
-                            <button onclick="window.startVoting(); window.changePage('voting')" ${gameState.isVoting ? 'disabled' : ''} class="btn btn-green">
+                            <button onclick="window.startVoting()" ${gameState.isVoting ? 'disabled' : ''} class="btn btn-green">
                                 ▶ Start Voting
                             </button>
                             <button onclick="window.resetGame()" class="btn btn-red">
