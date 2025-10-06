@@ -86,6 +86,12 @@
             gap: 1rem;
             max-width: 100%;
         }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            max-width: 100%;
+        }
         .player-tile {
             background: #334155;
             border: 2px solid #475569;
@@ -226,6 +232,10 @@
                 grid-template-columns: 1fr;
             }
             .grid-2 {
+                gap: 0.75rem;
+            }
+            .grid-3 {
+                grid-template-columns: 1fr;
                 gap: 0.75rem;
             }
             .player-tile {
@@ -415,15 +425,18 @@
         function startTimerCountdown() {
             if (timerInterval) clearInterval(timerInterval);
             isTimerController = true;
+            let countdown = 10;
 
             timerInterval = setInterval(async () => {
-                if (gameState.isVoting && gameState.timeLeft > 0) {
-                    const newTime = gameState.timeLeft - 1;
+                countdown--;
+                
+                if (countdown > 0) {
                     await update(ref(db, 'game'), {
-                        timeLeft: newTime
+                        timeLeft: countdown
                     });
-                } else if (gameState.isVoting && gameState.timeLeft <= 0) {
+                } else {
                     clearInterval(timerInterval);
+                    timerInterval = null;
                     isTimerController = false;
                     await endVoting();
                 }
@@ -432,6 +445,9 @@
 
         // Game functions
         async function startVoting() {
+            // Only proceed if not already voting
+            if (gameState.isVoting) return;
+            
             await update(ref(db, 'game'), {
                 isVoting: true,
                 timeLeft: 10,
@@ -666,17 +682,17 @@
                         <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">
                             👥 Master Controls
                         </h2>
-                        <div class="grid-2" style="margin-bottom: 0.75rem;">
+                        <div class="grid-3">
                             <button onclick="window.startVoting()" ${gameState.isVoting ? 'disabled' : ''} class="btn btn-green">
                                 ▶ Start Voting
                             </button>
                             <button onclick="window.resetGame()" class="btn btn-red">
                                 ↻ Reset Game
                             </button>
+                            <button onclick="window.changePage('voting')" class="btn btn-gray">
+                                ← Back to Voting
+                            </button>
                         </div>
-                        <button onclick="window.changePage('voting')" class="btn btn-gray" style="width: 100%;">
-                            ← Back to Voting
-                        </button>
                     </div>
             `;
 
