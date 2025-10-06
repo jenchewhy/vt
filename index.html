@@ -579,14 +579,11 @@
 
             // Player Selection
             if (myPlayerNumber === null) {
-                html += `
-                    <div style="margin-bottom: 2rem;">
-                        <h2 class="subtitle">Select Your Player Number</h2>
-                `;
+                html += `<div style="margin-bottom: 2rem;">`;
                 
                 if (gameState.totalPlayers < 15) {
                     html += `
-                        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem; gap: 1rem;">
+                        <div class="grid-2" style="margin-bottom: 1.5rem;">
                             <button onclick="window.addPlayers()" class="btn btn-gray">
                                 + Add Player (${gameState.totalPlayers}/15)
                             </button>
@@ -597,13 +594,15 @@
                     `;
                 } else {
                     html += `
-                        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
-                            <button onclick="window.changePage('results')" class="btn btn-gray">
+                        <div class="grid-2" style="margin-bottom: 1.5rem;">
+                            <button onclick="window.changePage('results')" class="btn btn-gray" style="grid-column: 1 / -1;">
                                 📊 Show Results
                             </button>
                         </div>
                     `;
                 }
+                
+                html += `<h2 class="subtitle">Select Your Player Number</h2>`;
 
                 html += '<div class="grid-2">';
                 const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
@@ -678,10 +677,7 @@
                 <div class="container">
                     <h1 class="title">Voting Results</h1>
 
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">
-                            👥 Master Controls
-                        </h2>
+                    <div style="margin-bottom: 1.5rem; max-width: 100%;">
                         <div class="grid-3">
                             <button onclick="window.startVoting()" ${gameState.isVoting ? 'disabled' : ''} class="btn btn-green">
                                 ▶ Start Voting
