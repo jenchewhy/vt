@@ -105,6 +105,45 @@
             transition: transform 0.2s, background 0.2s;
             transform: scale(0.95);
             min-height: 160px;
+            position: relative;
+        }
+        .player-tile.add-player {
+            background: transparent;
+            border: 2px dashed #475569;
+        }
+        .player-tile.add-player:hover:not(:disabled) {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+        .delete-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            width: 2rem;
+            height: 2rem;
+            background: #ef4444;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.25rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            z-index: 10;
+        }
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+        .add-icon {
+            font-size: 4rem;
+            color: #475569;
+            font-weight: 300;
+        }
+        .player-tile.add-player:hover .add-icon {
+            color: #22c55e;
         }
         .player-tile:hover:not(:disabled) {
             transform: scale(1.00);
@@ -481,10 +520,30 @@
         }
 
         async function addPlayers() {
-            if (gameState.totalPlayers < 15) {
+            if (gameState.totalPlayers < 16) {
                 await update(ref(db, 'game'), {
                     totalPlayers: gameState.totalPlayers + 1
                 });
+            }
+        }
+
+        async function deletePlayer(playerNum) {
+            if (gameState.totalPlayers <= 1) return; // Must have at least 1 player
+            
+            // Remove this player from selectedPlayers if they were selected
+            const newSelectedPlayers = gameState.selectedPlayers.filter(p => p !== playerNum);
+            
+            // If we're deleting the last player number, just decrement totalPlayers
+            if (playerNum === gameState.totalPlayers) {
+                await update(ref(db, 'game'), {
+                    totalPlayers: gameState.totalPlayers - 1,
+                    selectedPlayers: newSelectedPlayers
+                });
+            }
+            
+            // If deleting someone's selected player, deselect them
+            if (myPlayerNumber === playerNum) {
+                myPlayerNumber = null;
             }
         }
 
@@ -581,42 +640,44 @@
             if (myPlayerNumber === null) {
                 html += `<div style="margin-bottom: 2rem;">`;
                 
-                if (gameState.totalPlayers < 15) {
-                    html += `
-                        <div class="grid-2" style="margin-bottom: 1.5rem;">
-                            <button onclick="window.addPlayers()" class="btn btn-gray">
-                                + Add Player (${gameState.totalPlayers}/15)
-                            </button>
-                            <button onclick="window.changePage('results')" class="btn btn-gray">
-                                📊 Show Results
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="grid-2" style="margin-bottom: 1.5rem;">
-                            <button onclick="window.changePage('results')" class="btn btn-gray" style="grid-column: 1 / -1;">
-                                📊 Show Results
-                            </button>
-                        </div>
-                    `;
-                }
+                html += `
+                    <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+                        <button onclick="window.changePage('results')" class="btn btn-gray" style="min-width: 250px;">
+                            📊 Voting Results
+                        </button>
+                    </div>
+                `;
                 
                 html += `<h2 class="subtitle">Select Your Player Number</h2>`;
 
                 html += '<div class="grid-2">';
                 const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
+                
+                // Render existing players
                 for (let i = 1; i <= gameState.totalPlayers; i++) {
                     const isTaken = selectedPlayers.includes(i);
                     html += `
-                        <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
-                            <div class="player-number">${i}</div>
-                            <div class="player-badge">
-                                ${isTaken ? 'TAKEN' : 'SELECT'}
-                            </div>
+                        <div style="position: relative;">
+                            <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
+                                <div class="player-number">${i}</div>
+                                <div class="player-badge">
+                                    ${isTaken ? 'TAKEN' : 'SELECT'}
+                                </div>
+                            </button>
+                            <button onclick="window.deletePlayer(${i})" class="delete-btn">×</button>
+                        </div>
+                    `;
+                }
+                
+                // Render add player card if under 16 players
+                if (gameState.totalPlayers < 16) {
+                    html += `
+                        <button onclick="window.addPlayers()" class="player-tile add-player">
+                            <div class="add-icon">+</div>
                         </button>
                     `;
                 }
+                
                 html += '</div></div>';
             }
 
@@ -784,6 +845,7 @@
         window.startVoting = startVoting;
         window.resetGame = resetGame;
         window.addPlayers = addPlayers;
+        window.deletePlayer = deletePlayer;
         window.selectPlayerNumber = selectPlayerNumber;
         window.deselectPlayerNumber = deselectPlayerNumber;
         window.selectVote = selectVote;
