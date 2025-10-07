@@ -101,17 +101,22 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 1rem;
             cursor: pointer;
             transition: transform 0.2s, background 0.2s;
             transform: scale(0.95);
             min-height: 160px;
+            max-height: 160px;
             height: 160px;
             position: relative;
-            overflow: visible;
+            overflow: hidden;
+            width: 100%;
         }
         .player-tile.add-player {
             background: transparent;
             border: 2px dashed #475569;
+            min-height: 160px;
+            max-height: 160px;
             height: 160px;
         }
         .player-tile.add-player:hover:not(:disabled) {
@@ -129,17 +134,18 @@
             border: none;
             border-radius: 50%;
             color: white;
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
-            z-index: 10;
+            z-index: 100;
             line-height: 1;
             padding: 0;
             margin: 0;
+            flex-shrink: 0;
         }
         .delete-btn:hover {
             background: #dc2626;
@@ -170,23 +176,25 @@
             cursor: not-allowed;
         }
         .player-number {
-            font-size: 4.5rem;
+            font-size: 4rem;
             font-weight: bold;
             color: white;
-            margin-bottom: 1rem;
+            margin: 0;
             flex-shrink: 0;
             line-height: 1;
+            text-align: center;
         }
         .player-badge {
             background: #22c55e;
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 9999px;
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             font-weight: 600;
             flex-shrink: 0;
-            max-width: 120px;
             white-space: nowrap;
+            text-align: center;
+            display: inline-block;
         }
         .player-badge.white {
             background: white;
@@ -278,7 +286,7 @@
             }
             .player-number {
                 font-size: 3rem;
-                margin-bottom: 0.75rem;
+                margin: 0;
             }
             .grid-results {
                 grid-template-columns: 1fr;
@@ -292,6 +300,8 @@
             }
             .player-tile {
                 min-height: 140px;
+                max-height: 140px;
+                height: 140px;
                 padding: 1rem 0.75rem;
             }
             .container {
@@ -301,9 +311,6 @@
         @media (min-width: 769px) {
             .grid-2 {
                 grid-template-columns: repeat(4, 1fr);
-            }
-            .player-tile {
-                width: 100%;
             }
         }
         .grid-results {
