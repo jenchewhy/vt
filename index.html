@@ -110,10 +110,12 @@
         .player-tile.add-player {
             background: transparent;
             border: 2px dashed #475569;
+            min-height: 160px;
         }
         .player-tile.add-player:hover:not(:disabled) {
             border-color: #22c55e;
             background: rgba(34, 197, 94, 0.1);
+            transform: scale(1.00);
         }
         .delete-btn {
             position: absolute;
@@ -133,6 +135,7 @@
             justify-content: center;
             transition: background 0.2s;
             z-index: 10;
+            line-height: 1;
         }
         .delete-btn:hover {
             background: #dc2626;
@@ -141,6 +144,7 @@
             font-size: 4rem;
             color: #475569;
             font-weight: 300;
+            line-height: 1;
         }
         .player-tile.add-player:hover .add-icon {
             color: #22c55e;
