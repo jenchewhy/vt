@@ -659,15 +659,13 @@
                     const hasDeleteBtn = i >= 10; // Only show delete button for player 10+
                     
                     html += `
-                        <div style="position: relative;">
-                            <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
-                                ${hasDeleteBtn ? `<button onclick="event.stopPropagation(); window.deletePlayer(${i})" class="delete-btn">×</button>` : ''}
-                                <div class="player-number">${i}</div>
-                                <div class="player-badge">
-                                    ${isTaken ? 'TAKEN' : 'SELECT'}
-                                </div>
-                            </button>
-                        </div>
+                        <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
+                            ${hasDeleteBtn ? `<button onclick="event.stopPropagation(); window.deletePlayer(${i})" class="delete-btn">×</button>` : ''}
+                            <div class="player-number">${i}</div>
+                            <div class="player-badge">
+                                ${isTaken ? 'TAKEN' : 'SELECT'}
+                            </div>
+                        </button>
                     `;
                 }
                 
