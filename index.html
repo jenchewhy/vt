@@ -298,6 +298,11 @@
             left: 0.5rem;
             font-size: 2rem;
         }
+        .button-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
         @media (max-width: 768px) {
             .title {
                 font-size: 2rem;
@@ -322,6 +327,23 @@
             }
             .container {
                 padding: 1rem;
+            }
+            .button-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            .button-group .btn {
+                width: 100%;
+                min-height: 3.5rem;
+                font-size: 1rem;
+            }
+            .card-white, .card-dead {
+                padding: 1.25rem;
+            }
+            .flex-between {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
             }
         }
         @media (min-width: 769px) {
@@ -659,13 +681,20 @@
             });
         }
 
-        async function markAsDead() {
+        async function toggleDeadStatus() {
             if (!myPlayerNumber) return;
             
             const deadPlayers = Array.isArray(gameState.deadPlayers) ? gameState.deadPlayers : [];
-            if (deadPlayers.includes(myPlayerNumber)) return;
+            const isDead = deadPlayers.includes(myPlayerNumber);
             
-            const newDeadPlayers = [...deadPlayers, myPlayerNumber];
+            let newDeadPlayers;
+            if (isDead) {
+                // Remove from dead players (mark as alive)
+                newDeadPlayers = deadPlayers.filter(n => n !== myPlayerNumber);
+            } else {
+                // Add to dead players (mark as dead)
+                newDeadPlayers = [...deadPlayers, myPlayerNumber];
+            }
             
             await update(ref(db, 'game'), {
                 deadPlayers: newDeadPlayers
@@ -744,14 +773,14 @@
                 // Render existing players
                 for (let i = 1; i <= gameState.totalPlayers; i++) {
                     const isTaken = selectedPlayers.includes(i);
-                    const isDead = isPlayerDead(i);
+                    const isDeadPlayer = isPlayerDead(i);
                     
                     html += `
-                        <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile ${isDead ? 'dead' : ''}">
-                            ${isDead ? '<div class="dead-skull">💀</div>' : ''}
+                        <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile ${isDeadPlayer ? 'dead' : ''}">
+                            ${isDeadPlayer ? '<div class="dead-skull">💀</div>' : ''}
                             <div class="player-number">${i}</div>
-                            <div class="player-badge ${isDead ? 'red' : ''}">
-                                ${isDead ? 'DEAD' : isTaken ? 'TAKEN' : 'SELECT'}
+                            <div class="player-badge ${isDeadPlayer ? 'red' : ''}">
+                                ${isDeadPlayer ? 'DEAD' : isTaken ? 'TAKEN' : 'SELECT'}
                             </div>
                         </button>
                     `;
@@ -775,8 +804,10 @@
                                 </h2>
                                 <p class="text-gray">Round ${gameState.currentRound}</p>
                             </div>
-                            <div style="display: flex; gap: 0.5rem;">
-                                ${!isDead ? `<button onclick="window.markAsDead()" class="btn btn-red">💀 Mark as Dead</button>` : ''}
+                            <div class="button-group">
+                                <button onclick="window.toggleDeadStatus()" class="btn ${isDead ? 'btn-green' : 'btn-red'}">
+                                    ${isDead ? '✓ Mark as Alive' : '💀 Mark as Dead'}
+                                </button>
                                 <button onclick="window.deselectPlayerNumber()" class="btn btn-gray">
                                     ← Change Player No.
                                 </button>
@@ -962,7 +993,7 @@
         window.addPlayers = addPlayers;
         window.selectPlayerNumber = selectPlayerNumber;
         window.deselectPlayerNumber = deselectPlayerNumber;
-        window.markAsDead = markAsDead;
+        window.toggleDeadStatus = toggleDeadStatus;
         window.selectVote = selectVote;
         window.changePage = changePage;
 
