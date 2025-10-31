@@ -372,6 +372,36 @@
         let isListeningToTimer = true;
         let isTimerController = false;
 
+        // LocalStorage keys
+        const STORAGE_KEY_PLAYER = 'lrs_voting_player_number';
+
+        // Load saved player number on page load
+        function loadSavedPlayerNumber() {
+            const savedPlayer = localStorage.getItem(STORAGE_KEY_PLAYER);
+            if (savedPlayer) {
+                const playerNum = parseInt(savedPlayer);
+                // Check if this player number is still valid and available
+                const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
+                if (playerNum >= 1 && playerNum <= gameState.totalPlayers && selectedPlayers.includes(playerNum)) {
+                    myPlayerNumber = playerNum;
+                    console.log('Restored player number:', myPlayerNumber);
+                } else {
+                    // Clear invalid saved data
+                    localStorage.removeItem(STORAGE_KEY_PLAYER);
+                }
+            }
+        }
+
+        // Save player number to localStorage
+        function savePlayerNumber(num) {
+            localStorage.setItem(STORAGE_KEY_PLAYER, num.toString());
+        }
+
+        // Clear saved player number
+        function clearSavedPlayerNumber() {
+            localStorage.removeItem(STORAGE_KEY_PLAYER);
+        }
+
         // Connection status monitoring
         const connectedRef = ref(db, '.info/connected');
         onValue(connectedRef, (snapshot) => {
@@ -407,6 +437,11 @@
                     votes: data.votes || {},
                     voteHistory: data.voteHistory || []
                 };
+                
+                // Try to restore player number from localStorage if not set
+                if (myPlayerNumber === null) {
+                    loadSavedPlayerNumber();
+                }
                 
                 localTimeLeft = gameState.timeLeft;
                 
@@ -552,6 +587,7 @@
             await set(ref(db, 'game'), newState);
             
             myPlayerNumber = null;
+            clearSavedPlayerNumber();
             selectedVote = null;
             page = 'voting';
         }
@@ -561,6 +597,7 @@
             if (selectedPlayers.includes(num)) return;
             
             myPlayerNumber = num;
+            savePlayerNumber(num); // Save to localStorage
             const newSelectedPlayers = [...selectedPlayers, num];
             
             update(ref(db, 'game'), {
@@ -574,6 +611,7 @@
             const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
             const newSelectedPlayers = selectedPlayers.filter(n => n !== myPlayerNumber);
             myPlayerNumber = null;
+            clearSavedPlayerNumber(); // Clear from localStorage
             
             update(ref(db, 'game'), {
                 selectedPlayers: newSelectedPlayers
