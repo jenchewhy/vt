@@ -42,6 +42,13 @@
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
+        .card-dead {
+            background: #1e293b;
+            border: 2px solid #ef4444;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
         .btn {
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
@@ -119,6 +126,16 @@
             background: rgba(34, 197, 94, 0.1);
             transform: scale(1.00);
         }
+        .player-tile.dead {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: #1e293b;
+            border-color: #ef4444;
+        }
+        .player-tile.dead:hover {
+            transform: scale(0.95);
+            background: #1e293b;
+        }
         .delete-btn {
             position: absolute;
             top: 0.5rem;
@@ -154,11 +171,11 @@
         .player-tile.add-player:hover .add-icon {
             color: #22c55e;
         }
-        .player-tile:hover:not(:disabled) {
+        .player-tile:hover:not(:disabled):not(.dead) {
             transform: scale(1.00);
             background: #475569;
         }
-        .player-tile:disabled {
+        .player-tile:disabled:not(.dead) {
             opacity: 0.3;
             cursor: not-allowed;
         }
@@ -188,6 +205,10 @@
             background: white;
             color: #22c55e;
         }
+        .player-badge.red {
+            background: #ef4444;
+            color: white;
+        }
         .timer {
             background: #ef4444;
             color: white;
@@ -215,6 +236,9 @@
         }
         .text-gray {
             color: #94a3b8;
+        }
+        .text-red {
+            color: #ef4444;
         }
         .flex-between {
             display: flex;
@@ -267,6 +291,12 @@
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
+        }
+        .dead-skull {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            font-size: 2rem;
         }
         @media (max-width: 768px) {
             .title {
@@ -358,6 +388,7 @@
         let gameState = {
             totalPlayers: 9,
             selectedPlayers: [],
+            deadPlayers: [],
             isVoting: false,
             timeLeft: 10,
             currentRound: 1,
@@ -402,6 +433,12 @@
             localStorage.removeItem(STORAGE_KEY_PLAYER);
         }
 
+        // Check if player is dead
+        function isPlayerDead(playerNum) {
+            const deadPlayers = Array.isArray(gameState.deadPlayers) ? gameState.deadPlayers : [];
+            return deadPlayers.includes(playerNum);
+        }
+
         // Connection status monitoring
         const connectedRef = ref(db, '.info/connected');
         onValue(connectedRef, (snapshot) => {
@@ -420,453 +457,4 @@
             }
         }
 
-        // Listen to game state changes
-        const gameRef = ref(db, 'game');
-        onValue(gameRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                const wasVoting = gameState.isVoting;
-                
-                // Ensure arrays/objects exist with default values
-                gameState = {
-                    totalPlayers: data.totalPlayers || 10,
-                    selectedPlayers: data.selectedPlayers || [],
-                    isVoting: data.isVoting || false,
-                    timeLeft: data.timeLeft || 10,
-                    currentRound: data.currentRound || 1,
-                    votes: data.votes || {},
-                    voteHistory: data.voteHistory || []
-                };
-                
-                // Try to restore player number from localStorage if not set
-                if (myPlayerNumber === null) {
-                    loadSavedPlayerNumber();
-                }
-                
-                localTimeLeft = gameState.timeLeft;
-                
-                // Start local timer when voting begins
-                if (gameState.isVoting && !wasVoting) {
-                    startLocalTimer();
-                }
-                
-                // Stop local timer when voting ends
-                if (!gameState.isVoting && wasVoting) {
-                    stopLocalTimer();
-                }
-                
-                render();
-            }
-        });
-
-        // Initialize game state if it doesn't exist
-        get(gameRef).then((snapshot) => {
-            if (!snapshot.exists()) {
-                set(gameRef, {
-                    totalPlayers: 9,
-                    selectedPlayers: [],
-                    isVoting: false,
-                    timeLeft: 10,
-                    currentRound: 1,
-                    votes: {},
-                    voteHistory: []
-                });
-            }
-        });
-
-        // Local timer to update display without re-rendering
-        function startLocalTimer() {
-            stopLocalTimer();
-            localTimeLeft = gameState.timeLeft;
-            
-            timerInterval = setInterval(() => {
-                if (localTimeLeft > 0) {
-                    localTimeLeft--;
-                    // Only update timer display, don't re-render
-                    const timerElements = document.querySelectorAll('.timer');
-                    timerElements.forEach(el => {
-                        if (el.textContent.includes('Voting ends in')) {
-                            el.textContent = `Voting ends in: ${localTimeLeft}s`;
-                        } else if (el.textContent.includes('Voting Active')) {
-                            el.textContent = `Voting Active: ${localTimeLeft}s`;
-                        }
-                    });
-                } else {
-                    stopLocalTimer();
-                }
-            }, 1000);
-        }
-
-        function stopLocalTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-        }
-
-        // Start timer countdown (controlled by whoever clicks Start Voting)
-        function startTimerCountdown() {
-            if (timerInterval) clearInterval(timerInterval);
-            isTimerController = true;
-            let countdown = 10;
-
-            timerInterval = setInterval(async () => {
-                countdown--;
-                
-                if (countdown > 0) {
-                    await update(ref(db, 'game'), {
-                        timeLeft: countdown
-                    });
-                } else {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                    isTimerController = false;
-                    await endVoting();
-                }
-            }, 1000);
-        }
-
-        // Game functions
-        async function startVoting() {
-            // Only proceed if not already voting
-            if (gameState.isVoting) return;
-            
-            await update(ref(db, 'game'), {
-                isVoting: true,
-                timeLeft: 10,
-                votes: {}
-            });
-            
-            // Start the countdown from this device
-            setTimeout(() => {
-                startTimerCountdown();
-            }, 100);
-        }
-
-        async function endVoting() {
-            if (timerInterval) clearInterval(timerInterval);
-            
-            const finalVotes = { ...gameState.votes };
-            const newHistory = Array.isArray(gameState.voteHistory) ? [...gameState.voteHistory] : [];
-            newHistory.push({
-                round: gameState.currentRound,
-                votes: finalVotes
-            });
-            
-            await update(ref(db, 'game'), {
-                isVoting: false,
-                voteHistory: newHistory,
-                currentRound: gameState.currentRound + 1,
-                votes: {}
-            });
-            
-            selectedVote = null;
-        }
-
-        async function addPlayers() {
-            if (gameState.totalPlayers < 16) {
-                await update(ref(db, 'game'), {
-                    totalPlayers: gameState.totalPlayers + 1
-                });
-            }
-        }
-
-        async function resetGame() {
-            if (timerInterval) clearInterval(timerInterval);
-            
-            const newState = {
-                totalPlayers: 9,
-                selectedPlayers: [],
-                isVoting: false,
-                timeLeft: 10,
-                currentRound: 1,
-                votes: {},
-                voteHistory: []
-            };
-            
-            await set(ref(db, 'game'), newState);
-            
-            myPlayerNumber = null;
-            clearSavedPlayerNumber();
-            selectedVote = null;
-            page = 'voting';
-        }
-
-        function selectPlayerNumber(num) {
-            const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
-            if (selectedPlayers.includes(num)) return;
-            
-            myPlayerNumber = num;
-            savePlayerNumber(num); // Save to localStorage
-            const newSelectedPlayers = [...selectedPlayers, num];
-            
-            update(ref(db, 'game'), {
-                selectedPlayers: newSelectedPlayers
-            });
-        }
-
-        function deselectPlayerNumber() {
-            if (!myPlayerNumber) return;
-            
-            const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
-            const newSelectedPlayers = selectedPlayers.filter(n => n !== myPlayerNumber);
-            myPlayerNumber = null;
-            clearSavedPlayerNumber(); // Clear from localStorage
-            
-            update(ref(db, 'game'), {
-                selectedPlayers: newSelectedPlayers
-            });
-        }
-
-        async function selectVote(num) {
-            if (!gameState.isVoting || !myPlayerNumber) return;
-            
-            selectedVote = num;
-            
-            const votePath = `game/votes/${myPlayerNumber}`;
-            await set(ref(db, votePath), num);
-            
-            render();
-        }
-
-        function getVoteResults(roundVotes) {
-            const results = {};
-            const didNotVote = [];
-            
-            if (roundVotes && typeof roundVotes === 'object') {
-                Object.entries(roundVotes).forEach(([voter, voted]) => {
-                    if (!results[voted]) {
-                        results[voted] = [];
-                    }
-                    results[voted].push(parseInt(voter));
-                });
-            }
-
-            for (let i = 1; i <= gameState.totalPlayers; i++) {
-                if (!roundVotes || !roundVotes[i]) {
-                    didNotVote.push(i);
-                }
-            }
-
-            return { results, didNotVote };
-        }
-
-        // Render functions
-        function renderVotingPage() {
-            let html = `
-                <div class="container">
-                    <h1 class="title">LRS Voting</h1>
-            `;
-
-            // Voting Timer
-            if (gameState.isVoting) {
-                html += `<div class="timer">Voting ends in: ${localTimeLeft}s</div>`;
-            }
-
-            // Player Selection
-            if (myPlayerNumber === null) {
-                html += `<div style="margin-bottom: 2rem;">`;
-                
-                html += `
-                    <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
-                        ${gameState.totalPlayers < 16 ? `<button onclick="window.addPlayers()" class="btn btn-gray">+ Add Player (${gameState.totalPlayers}/16)</button>` : ''}
-                        <button onclick="window.changePage('results')" class="btn btn-gray">📊 Voting Results</button>
-                    </div>
-                `;
-                
-                html += `<h2 class="subtitle">Select Your Player Number</h2>`;
-
-                html += '<div class="grid-2">';
-                const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
-                
-                // Render existing players
-                for (let i = 1; i <= gameState.totalPlayers; i++) {
-                    const isTaken = selectedPlayers.includes(i);
-                    
-                    html += `
-                        <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile">
-                            <div class="player-number">${i}</div>
-                            <div class="player-badge">
-                                ${isTaken ? 'TAKEN' : 'SELECT'}
-                            </div>
-                        </button>
-                    `;
-                }
-                
-                html += '</div></div>';
-            }
-
-            // Voting Interface
-            if (myPlayerNumber !== null) {
-                html += `
-                    <div class="card-white">
-                        <div class="flex-between">
-                            <div>
-                                <h2 class="text-white" style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem;">
-                                    You are
-                                </h2>
-                                <h2 class="text-white" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem;">
-                                    Player ${myPlayerNumber}
-                                </h2>
-                                <p class="text-gray">Round ${gameState.currentRound}</p>
-                            </div>
-                            <button onclick="window.deselectPlayerNumber()" class="btn btn-gray">
-                                ← Change Player No.
-                            </button>
-                        </div>
-                    </div>
-
-                    <h2 class="subtitle">
-                        ${gameState.isVoting ? 'Vote now...' : 'Waiting for voting to start...'}
-                    </h2>
-
-                    <div class="grid-2">
-                `;
-
-                for (let i = 1; i <= gameState.totalPlayers; i++) {
-                    if (i !== myPlayerNumber) {
-                        const isSelected = selectedVote === i;
-                        const classes = isSelected 
-                            ? 'player-tile selected'
-                            : !gameState.isVoting
-                            ? 'player-tile disabled-vote'
-                            : 'player-tile';
-                        html += `
-                            <button onclick="window.selectVote(${i})" ${!gameState.isVoting ? 'disabled' : ''} class="${classes}">
-                                <div class="player-number">${i}</div>
-                                <div class="player-badge ${isSelected ? 'white' : ''}">
-                                    ${isSelected ? 'SELECTED' : 'VOTE'}
-                                </div>
-                            </button>
-                        `;
-                    }
-                }
-                html += '</div>';
-            }
-
-            html += '</div>';
-            return html;
-        }
-
-        function renderResultsPage() {
-            let html = `
-                <div class="container">
-                    <h1 class="title">Voting Results</h1>
-
-                    <div style="margin-bottom: 1.5rem; max-width: 100%;">
-                        <div class="grid-3">
-                            <button onclick="window.startVoting()" ${gameState.isVoting ? 'disabled' : ''} class="btn btn-green">
-                                ▶ Start Voting
-                            </button>
-                            <button onclick="window.resetGame()" class="btn btn-red">
-                                ↻ Reset Game
-                            </button>
-                            <button onclick="window.changePage('voting')" class="btn btn-gray">
-                                ← Back to Voting
-                            </button>
-                        </div>
-                    </div>
-            `;
-
-            if (gameState.isVoting) {
-                html += `<div class="timer" style="margin-bottom: 2rem;">Voting Active: ${localTimeLeft}s</div>`;
-            }
-
-            const voteHistory = Array.isArray(gameState.voteHistory) ? gameState.voteHistory : [];
-            if (voteHistory.length === 0) {
-                html += `<div class="no-results">No voting history yet...</div>`;
-            } else {
-                html += '<div class="grid-results">';
-                
-                voteHistory.forEach((record) => {
-                    if (!record || !record.votes) return;
-                    
-                    const { results, didNotVote } = getVoteResults(record.votes);
-                    
-                    html += `
-                        <div class="card">
-                            <h2 class="text-white" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem;">
-                                Round ${record.round}
-                            </h2>
-                            <div style="margin-bottom: 1.5rem;">
-                    `;
-
-                    const sortedResults = Object.entries(results).sort(([, a], [, b]) => b.length - a.length);
-                    sortedResults.forEach(([player, voters], index) => {
-                        html += `
-                            <div class="vote-result ${index === 0 ? 'top' : ''}">
-                                <div class="flex-wrap" style="align-items: center;">
-                                    <div class="voter-avatar">${player}</div>
-                                    <span class="text-white" style="font-weight: 600; font-size: 1.125rem;">voted by</span>
-                                    <div class="flex-wrap" style="flex: 1;">
-                        `;
-                        
-                        voters.sort((a, b) => a - b).forEach(voter => {
-                            html += `<span class="voter-chip">${voter}</span>`;
-                        });
-
-                        html += `
-                                    </div>
-                                    <div class="vote-count">
-                                        ${voters.length} ${voters.length === 1 ? 'vote' : 'votes'}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    });
-
-                    html += '</div>';
-
-                    if (didNotVote.length > 0) {
-                        html += `
-                            <div class="vote-result">
-                                <div class="flex-wrap" style="align-items: center;">
-                                    <span class="text-gray" style="font-weight: 600; font-size: 1.125rem;">Did Not Vote:</span>
-                                    <div class="flex-wrap">
-                        `;
-                        
-                        didNotVote.sort((a, b) => a - b).forEach(player => {
-                            html += `<span class="voter-chip">${player}</span>`;
-                        });
-
-                        html += '</div></div></div>';
-                    }
-
-                    html += '</div>';
-                });
-
-                html += '</div>';
-            }
-
-            html += '</div>';
-            return html;
-        }
-
-        function render() {
-            const app = document.getElementById('app');
-            if (page === 'voting') {
-                app.innerHTML = renderVotingPage();
-            } else {
-                app.innerHTML = renderResultsPage();
-            }
-        }
-
-        function changePage(newPage) {
-            page = newPage;
-            render();
-        }
-
-        // Expose functions to global scope for onclick handlers
-        window.startVoting = startVoting;
-        window.resetGame = resetGame;
-        window.addPlayers = addPlayers;
-        window.selectPlayerNumber = selectPlayerNumber;
-        window.deselectPlayerNumber = deselectPlayerNumber;
-        window.selectVote = selectVote;
-        window.changePage = changePage;
-
-        // Initial render
-        render();
-    </script>
-</body>
-</html>
+        // Listen to game s
