@@ -457,4 +457,517 @@
             }
         }
 
-        // Listen to game s
+        // Listen to game state changes
+        const gameRef = ref(db, 'game');
+        onValue(gameRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const wasVoting = gameState.isVoting;
+                
+                // Ensure arrays/objects exist with default values
+                gameState = {
+                    totalPlayers: data.totalPlayers || 10,
+                    selectedPlayers: data.selectedPlayers || [],
+                    deadPlayers: data.deadPlayers || [],
+                    isVoting: data.isVoting || false,
+                    timeLeft: data.timeLeft || 10,
+                    currentRound: data.currentRound || 1,
+                    votes: data.votes || {},
+                    voteHistory: data.voteHistory || []
+                };
+                
+                // Try to restore player number from localStorage if not set
+                if (myPlayerNumber === null) {
+                    loadSavedPlayerNumber();
+                }
+                
+                localTimeLeft = gameState.timeLeft;
+                
+                // Start local timer when voting begins
+                if (gameState.isVoting && !wasVoting) {
+                    startLocalTimer();
+                }
+                
+                // Stop local timer when voting ends
+                if (!gameState.isVoting && wasVoting) {
+                    stopLocalTimer();
+                }
+                
+                render();
+            }
+        });
+
+        // Initialize game state if it doesn't exist
+        get(gameRef).then((snapshot) => {
+            if (!snapshot.exists()) {
+                set(gameRef, {
+                    totalPlayers: 9,
+                    selectedPlayers: [],
+                    deadPlayers: [],
+                    isVoting: false,
+                    timeLeft: 10,
+                    currentRound: 1,
+                    votes: {},
+                    voteHistory: []
+                });
+            }
+        });
+
+        // Local timer to update display without re-rendering
+        function startLocalTimer() {
+            stopLocalTimer();
+            localTimeLeft = gameState.timeLeft;
+            
+            timerInterval = setInterval(() => {
+                if (localTimeLeft > 0) {
+                    localTimeLeft--;
+                    // Only update timer display, don't re-render
+                    const timerElements = document.querySelectorAll('.timer');
+                    timerElements.forEach(el => {
+                        if (el.textContent.includes('Voting ends in')) {
+                            el.textContent = `Voting ends in: ${localTimeLeft}s`;
+                        } else if (el.textContent.includes('Voting Active')) {
+                            el.textContent = `Voting Active: ${localTimeLeft}s`;
+                        }
+                    });
+                } else {
+                    stopLocalTimer();
+                }
+            }, 1000);
+        }
+
+        function stopLocalTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // Start timer countdown (controlled by whoever clicks Start Voting)
+        function startTimerCountdown() {
+            if (timerInterval) clearInterval(timerInterval);
+            isTimerController = true;
+            let countdown = 10;
+
+            timerInterval = setInterval(async () => {
+                countdown--;
+                
+                if (countdown > 0) {
+                    await update(ref(db, 'game'), {
+                        timeLeft: countdown
+                    });
+                } else {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    isTimerController = false;
+                    await endVoting();
+                }
+            }, 1000);
+        }
+
+        // Game functions
+        async function startVoting() {
+            // Only proceed if not already voting
+            if (gameState.isVoting) return;
+            
+            await update(ref(db, 'game'), {
+                isVoting: true,
+                timeLeft: 10,
+                votes: {}
+            });
+            
+            // Start the countdown from this device
+            setTimeout(() => {
+                startTimerCountdown();
+            }, 100);
+        }
+
+        async function endVoting() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const finalVotes = { ...gameState.votes };
+            const newHistory = Array.isArray(gameState.voteHistory) ? [...gameState.voteHistory] : [];
+            newHistory.push({
+                round: gameState.currentRound,
+                votes: finalVotes,
+                deadPlayers: [...(gameState.deadPlayers || [])]
+            });
+            
+            await update(ref(db, 'game'), {
+                isVoting: false,
+                voteHistory: newHistory,
+                currentRound: gameState.currentRound + 1,
+                votes: {}
+            });
+            
+            selectedVote = null;
+        }
+
+        async function addPlayers() {
+            if (gameState.totalPlayers < 16) {
+                await update(ref(db, 'game'), {
+                    totalPlayers: gameState.totalPlayers + 1
+                });
+            }
+        }
+
+        async function resetGame() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const newState = {
+                totalPlayers: 9,
+                selectedPlayers: [],
+                deadPlayers: [],
+                isVoting: false,
+                timeLeft: 10,
+                currentRound: 1,
+                votes: {},
+                voteHistory: []
+            };
+            
+            await set(ref(db, 'game'), newState);
+            
+            myPlayerNumber = null;
+            clearSavedPlayerNumber();
+            selectedVote = null;
+            page = 'voting';
+        }
+
+        function selectPlayerNumber(num) {
+            const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
+            if (selectedPlayers.includes(num)) return;
+            
+            myPlayerNumber = num;
+            savePlayerNumber(num); // Save to localStorage
+            const newSelectedPlayers = [...selectedPlayers, num];
+            
+            update(ref(db, 'game'), {
+                selectedPlayers: newSelectedPlayers
+            });
+        }
+
+        function deselectPlayerNumber() {
+            if (!myPlayerNumber) return;
+            
+            const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
+            const newSelectedPlayers = selectedPlayers.filter(n => n !== myPlayerNumber);
+            myPlayerNumber = null;
+            clearSavedPlayerNumber(); // Clear from localStorage
+            
+            update(ref(db, 'game'), {
+                selectedPlayers: newSelectedPlayers
+            });
+        }
+
+        async function markAsDead() {
+            if (!myPlayerNumber) return;
+            
+            const deadPlayers = Array.isArray(gameState.deadPlayers) ? gameState.deadPlayers : [];
+            if (deadPlayers.includes(myPlayerNumber)) return;
+            
+            const newDeadPlayers = [...deadPlayers, myPlayerNumber];
+            
+            await update(ref(db, 'game'), {
+                deadPlayers: newDeadPlayers
+            });
+        }
+
+        async function selectVote(num) {
+            if (!gameState.isVoting || !myPlayerNumber || isPlayerDead(myPlayerNumber)) return;
+            if (isPlayerDead(num)) return; // Can't vote for dead players
+            
+            selectedVote = num;
+            
+            const votePath = `game/votes/${myPlayerNumber}`;
+            await set(ref(db, votePath), num);
+            
+            render();
+        }
+
+        function getVoteResults(roundVotes, roundDeadPlayers) {
+            const results = {};
+            const didNotVote = [];
+            const deadPlayers = Array.isArray(roundDeadPlayers) ? roundDeadPlayers : [];
+            
+            if (roundVotes && typeof roundVotes === 'object') {
+                Object.entries(roundVotes).forEach(([voter, voted]) => {
+                    // Don't count votes from or to dead players
+                    if (!deadPlayers.includes(parseInt(voter)) && !deadPlayers.includes(parseInt(voted))) {
+                        if (!results[voted]) {
+                            results[voted] = [];
+                        }
+                        results[voted].push(parseInt(voter));
+                    }
+                });
+            }
+
+            // Only count alive players who didn't vote
+            for (let i = 1; i <= gameState.totalPlayers; i++) {
+                if (!deadPlayers.includes(i) && (!roundVotes || !roundVotes[i])) {
+                    didNotVote.push(i);
+                }
+            }
+
+            return { results, didNotVote };
+        }
+
+        // Render functions
+        function renderVotingPage() {
+            const isDead = myPlayerNumber !== null && isPlayerDead(myPlayerNumber);
+            
+            let html = `
+                <div class="container">
+                    <h1 class="title">LRS Voting</h1>
+            `;
+
+            // Voting Timer
+            if (gameState.isVoting) {
+                html += `<div class="timer">Voting ends in: ${localTimeLeft}s</div>`;
+            }
+
+            // Player Selection
+            if (myPlayerNumber === null) {
+                html += `<div style="margin-bottom: 2rem;">`;
+                
+                html += `
+                    <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
+                        ${gameState.totalPlayers < 16 ? `<button onclick="window.addPlayers()" class="btn btn-gray">+ Add Player (${gameState.totalPlayers}/16)</button>` : ''}
+                        <button onclick="window.changePage('results')" class="btn btn-gray">📊 Voting Results</button>
+                    </div>
+                `;
+                
+                html += `<h2 class="subtitle">Select Your Player Number</h2>`;
+
+                html += '<div class="grid-2">';
+                const selectedPlayers = Array.isArray(gameState.selectedPlayers) ? gameState.selectedPlayers : [];
+                
+                // Render existing players
+                for (let i = 1; i <= gameState.totalPlayers; i++) {
+                    const isTaken = selectedPlayers.includes(i);
+                    const isDead = isPlayerDead(i);
+                    
+                    html += `
+                        <button onclick="window.selectPlayerNumber(${i})" ${isTaken ? 'disabled' : ''} class="player-tile ${isDead ? 'dead' : ''}">
+                            ${isDead ? '<div class="dead-skull">💀</div>' : ''}
+                            <div class="player-number">${i}</div>
+                            <div class="player-badge ${isDead ? 'red' : ''}">
+                                ${isDead ? 'DEAD' : isTaken ? 'TAKEN' : 'SELECT'}
+                            </div>
+                        </button>
+                    `;
+                }
+                
+                html += '</div></div>';
+            }
+
+            // Voting Interface
+            if (myPlayerNumber !== null) {
+                const cardClass = isDead ? 'card-dead' : 'card-white';
+                html += `
+                    <div class="${cardClass}">
+                        <div class="flex-between">
+                            <div>
+                                <h2 class="${isDead ? 'text-red' : 'text-white'}" style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem;">
+                                    You are
+                                </h2>
+                                <h2 class="${isDead ? 'text-red' : 'text-white'}" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem;">
+                                    Player ${myPlayerNumber} ${isDead ? '💀 (DEAD)' : ''}
+                                </h2>
+                                <p class="text-gray">Round ${gameState.currentRound}</p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                ${!isDead ? `<button onclick="window.markAsDead()" class="btn btn-red">💀 Mark as Dead</button>` : ''}
+                                <button onclick="window.deselectPlayerNumber()" class="btn btn-gray">
+                                    ← Change Player No.
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="subtitle">
+                        ${isDead 
+                            ? 'You are dead - spectating...' 
+                            : gameState.isVoting 
+                                ? 'Vote now...' 
+                                : 'Waiting for voting to start...'}
+                    </h2>
+
+                    <div class="grid-2">
+                `;
+
+                for (let i = 1; i <= gameState.totalPlayers; i++) {
+                    if (i !== myPlayerNumber) {
+                        const isSelected = selectedVote === i;
+                        const isTargetDead = isPlayerDead(i);
+                        const canVote = !isDead && gameState.isVoting && !isTargetDead;
+                        
+                        const classes = isTargetDead
+                            ? 'player-tile dead'
+                            : isSelected 
+                                ? 'player-tile selected'
+                                : !canVote
+                                    ? 'player-tile disabled-vote'
+                                    : 'player-tile';
+                        
+                        html += `
+                            <button onclick="window.selectVote(${i})" ${!canVote ? 'disabled' : ''} class="${classes}">
+                                ${isTargetDead ? '<div class="dead-skull">💀</div>' : ''}
+                                <div class="player-number">${i}</div>
+                                <div class="player-badge ${isSelected ? 'white' : isTargetDead ? 'red' : ''}">
+                                    ${isTargetDead ? 'DEAD' : isSelected ? 'SELECTED' : 'VOTE'}
+                                </div>
+                            </button>
+                        `;
+                    }
+                }
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderResultsPage() {
+            let html = `
+                <div class="container">
+                    <h1 class="title">Voting Results</h1>
+
+                    <div style="margin-bottom: 1.5rem; max-width: 100%;">
+                        <div class="grid-3">
+                            <button onclick="window.startVoting()" ${gameState.isVoting ? 'disabled' : ''} class="btn btn-green">
+                                ▶ Start Voting
+                            </button>
+                            <button onclick="window.resetGame()" class="btn btn-red">
+                                ↻ Reset Game
+                            </button>
+                            <button onclick="window.changePage('voting')" class="btn btn-gray">
+                                ← Back to Voting
+                            </button>
+                        </div>
+                    </div>
+            `;
+
+            if (gameState.isVoting) {
+                html += `<div class="timer" style="margin-bottom: 2rem;">Voting Active: ${localTimeLeft}s</div>`;
+            }
+
+            const voteHistory = Array.isArray(gameState.voteHistory) ? gameState.voteHistory : [];
+            if (voteHistory.length === 0) {
+                html += `<div class="no-results">No voting history yet...</div>`;
+            } else {
+                html += '<div class="grid-results">';
+                
+                voteHistory.forEach((record) => {
+                    if (!record || !record.votes) return;
+                    
+                    const { results, didNotVote } = getVoteResults(record.votes, record.deadPlayers || []);
+                    const deadPlayers = record.deadPlayers || [];
+                    
+                    html += `
+                        <div class="card">
+                            <h2 class="text-white" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem;">
+                                Round ${record.round}
+                            </h2>
+                            <div style="margin-bottom: 1.5rem;">
+                    `;
+
+                    const sortedResults = Object.entries(results).sort(([, a], [, b]) => b.length - a.length);
+                    
+                    if (sortedResults.length === 0) {
+                        html += `<p class="text-gray" style="text-align: center; padding: 2rem 0;">No votes cast this round</p>`;
+                    } else {
+                        sortedResults.forEach(([player, voters], index) => {
+                            html += `
+                                <div class="vote-result ${index === 0 ? 'top' : ''}">
+                                    <div class="flex-wrap" style="align-items: center;">
+                                        <div class="voter-avatar">${player}</div>
+                                        <span class="text-white" style="font-weight: 600; font-size: 1.125rem;">voted by</span>
+                                        <div class="flex-wrap" style="flex: 1;">
+                            `;
+                            
+                            voters.sort((a, b) => a - b).forEach(voter => {
+                                html += `<span class="voter-chip">${voter}</span>`;
+                            });
+
+                            html += `
+                                        </div>
+                                        <div class="vote-count">
+                                            ${voters.length} ${voters.length === 1 ? 'vote' : 'votes'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    html += '</div>';
+
+                    if (didNotVote.length > 0) {
+                        html += `
+                            <div class="vote-result">
+                                <div class="flex-wrap" style="align-items: center;">
+                                    <span class="text-gray" style="font-weight: 600; font-size: 1.125rem;">Did Not Vote:</span>
+                                    <div class="flex-wrap">
+                        `;
+                        
+                        didNotVote.sort((a, b) => a - b).forEach(player => {
+                            html += `<span class="voter-chip">${player}</span>`;
+                        });
+
+                        html += '</div></div></div>';
+                    }
+
+                    if (deadPlayers.length > 0) {
+                        html += `
+                            <div class="vote-result">
+                                <div class="flex-wrap" style="align-items: center;">
+                                    <span class="text-red" style="font-weight: 600; font-size: 1.125rem;">💀 Dead Players:</span>
+                                    <div class="flex-wrap">
+                        `;
+                        
+                        deadPlayers.sort((a, b) => a - b).forEach(player => {
+                            html += `<span class="voter-chip" style="background: #ef4444;">${player}</span>`;
+                        });
+
+                        html += '</div></div></div>';
+                    }
+
+                    html += '</div>';
+                });
+
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            if (page === 'voting') {
+                app.innerHTML = renderVotingPage();
+            } else {
+                app.innerHTML = renderResultsPage();
+            }
+        }
+
+        function changePage(newPage) {
+            page = newPage;
+            render();
+        }
+
+        // Expose functions to global scope for onclick handlers
+        window.startVoting = startVoting;
+        window.resetGame = resetGame;
+        window.addPlayers = addPlayers;
+        window.selectPlayerNumber = selectPlayerNumber;
+        window.deselectPlayerNumber = deselectPlayerNumber;
+        window.markAsDead = markAsDead;
+        window.selectVote = selectVote;
+        window.changePage = changePage;
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
